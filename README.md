@@ -1,4 +1,4 @@
-# Guess Who? India — Full Stack
+# Guess Who?
 
 A real-time multiplayer guessing game built with **FastAPI + WebSockets + SQLite**.
 
