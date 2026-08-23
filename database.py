@@ -4,7 +4,10 @@ SQLite database setup — characters and rooms.
 """
 import sqlite3, json, os
 
-DB_PATH = os.environ.get("DB_PATH", "guesswhoindia.db")
+# Use /tmp on read-only filesystems (Render free tier)
+# or override with DB_PATH env variable for persistent storage
+_default_db = "/tmp/guesswhoindia.db"
+DB_PATH = os.environ.get("DB_PATH", _default_db)
 
 # ── Default character seed data ────────────────────────────────────────────────
 DEFAULT_CHARS = [
@@ -86,7 +89,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS rooms (
             code        TEXT PRIMARY KEY,
             state       TEXT NOT NULL,
-            updated_at  REAL NOT NULL DEFAULT (unixepoch('now','subsec'))
+            updated_at  REAL NOT NULL DEFAULT 0
         )
     """)
 
@@ -125,13 +128,14 @@ def update_character(char_id: int, fields: dict):
 
 def save_room(code: str, state: dict):
     conn = get_conn()
+    now = time.time()
     conn.execute("""
         INSERT INTO rooms (code, state, updated_at)
-        VALUES (?, ?, unixepoch('now','subsec'))
+        VALUES (?, ?, ?)
         ON CONFLICT(code) DO UPDATE SET
             state=excluded.state,
             updated_at=excluded.updated_at
-    """, (code, json.dumps(state)))
+    """, (code, json.dumps(state), now))
     conn.commit()
     conn.close()
 
@@ -153,9 +157,10 @@ def delete_room(code: str):
 def cleanup_old_rooms(max_age_hours: int = 6):
     """Remove rooms older than max_age_hours to keep the DB small."""
     conn = get_conn()
+    import time as _time
     conn.execute(
-        "DELETE FROM rooms WHERE updated_at < unixepoch('now','subsec') - ?",
-        (max_age_hours * 3600,)
+        "DELETE FROM rooms WHERE updated_at < ?",
+        (_time.time() - max_age_hours * 3600,)
     )
     conn.commit()
     conn.close()

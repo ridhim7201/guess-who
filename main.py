@@ -26,7 +26,26 @@ import game as gm
 
 # ── App setup ──────────────────────────────────────────────────────────────────
 
-app = FastAPI(title="Guess Who? India")
+from contextlib import asynccontextmanager
+
+async def _room_cleanup_loop():
+    while True:
+        await asyncio.sleep(3600)
+        db.cleanup_old_rooms(max_age_hours=6)
+
+@asynccontextmanager
+async def lifespan(_app):
+    try:
+        db.init_db()
+        print("[startup] DB initialized OK")
+    except Exception as e:
+        print(f"[startup] DB init error: {e}")
+        raise
+    task = asyncio.create_task(_room_cleanup_loop())
+    yield
+    task.cancel()
+
+app = FastAPI(title="Guess Who? India", lifespan=lifespan)
 
 BASE_DIR    = Path(__file__).parent
 STATIC_DIR  = BASE_DIR / "static"
@@ -39,19 +58,7 @@ STATIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TMPL_DIR))
 
-# ── Startup ────────────────────────────────────────────────────────────────────
 
-@app.on_event("startup")
-async def startup():
-    db.init_db()
-    # Periodically clean up old rooms
-    asyncio.create_task(_room_cleanup_loop())
-
-
-async def _room_cleanup_loop():
-    while True:
-        await asyncio.sleep(3600)   # every hour
-        db.cleanup_old_rooms(max_age_hours=6)
 
 
 # ── WebSocket room manager ─────────────────────────────────────────────────────
@@ -213,12 +220,21 @@ async def handle_ws_message(code: str, ws_id: str, ws: WebSocket, msg: dict):
 @app.post("/api/rooms")
 async def api_create_room(request: Request):
     """Create a new room. Returns the room code."""
-    body   = await request.json()
-    mode   = body.get("mode", "2p")
-    name   = body.get("name", "Player 1")
-    chars  = db.get_all_characters()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    mode = body.get("mode", "2p")
+    name = body.get("name", "Player 1")
 
-    # Generate a unique code
+    try:
+        chars = db.get_all_characters()
+        if not chars:
+            db.init_db()
+            chars = db.get_all_characters()
+    except Exception as e:
+        raise HTTPException(500, f"DB error: {e}")
+
     for _ in range(20):
         code = gm.gen_code()
         if not db.load_room(code):
@@ -240,6 +256,14 @@ async def api_get_room(code: str):
 @app.get("/api/characters")
 async def api_get_characters():
     return db.get_all_characters()
+
+
+@app.get("/api/characters/{char_id}")
+async def api_get_character(char_id: int):
+    char = db.get_character(char_id)
+    if not char:
+        raise HTTPException(404, "Character not found")
+    return char
 
 
 @app.patch("/api/characters/{char_id}")
