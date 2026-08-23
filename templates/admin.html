@@ -236,7 +236,7 @@ let currentId = null;
 let pendingPhotoFile = null;
 
 async function openEdit(id) {
-  if (id === null || id === undefined) { showToast("Error: character ID missing"); return; }
+  if (id === null || id === undefined || isNaN(id)) { showToast("Error: character ID missing"); return; }
   currentId = id;
   pendingPhotoFile = null;
 
@@ -267,7 +267,7 @@ async function openEdit(id) {
 
       const preview = document.getElementById("photo-preview");
       if (c.photo) {
-        preview.src = c.photo + "?t=" + Date.now();
+        preview.src = c.photo;
         preview.classList.add("show");
       } else {
         preview.classList.remove("show");
@@ -292,7 +292,7 @@ function previewPhoto(e) {
 }
 
 async function removePhoto() {
-  if (!currentId) return;
+  if (currentId === null || currentId === undefined) return;
   await fetch(`/api/characters/${currentId}/photo`, { method:"DELETE" });
   pendingPhotoFile = null;
   document.getElementById("photo-preview").classList.remove("show");
@@ -301,7 +301,7 @@ async function removePhoto() {
 }
 
 async function saveEdit() {
-  if (!currentId) return;
+  if (currentId === null || currentId === undefined) return;
 
   // Upload photo first if pending
   if (pendingPhotoFile) {
@@ -345,7 +345,7 @@ async function refreshCard(id) {
   if (!card) return;
 
   const photoHTML = c.photo
-    ? `<img class="ccard-photo" src="${c.photo}?t=${Date.now()}" alt="${c.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+    ? `<img class="ccard-photo" src="${c.photo}" alt="${c.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
        <div class="ccard-photo-placeholder" style="display:none">👤</div>`
     : `<div class="ccard-photo-placeholder">👤</div>`;
 
