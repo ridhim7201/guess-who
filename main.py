@@ -9,7 +9,7 @@ Deploy (Railway / Render / DigitalOcean):
     uvicorn main:app --host 0.0.0.0 --port $PORT
 """
 
-import asyncio, json, os, shutil, time, uuid
+import asyncio, json, os, time, uuid
 from pathlib import Path
 from typing import Optional
 
@@ -281,30 +281,29 @@ async def api_update_character(char_id: int, request: Request):
 
 @app.post("/api/characters/{char_id}/photo")
 async def api_upload_photo(char_id: int, file: UploadFile = File(...)):
-    """Upload a photo for a character. Saved to static/photos/."""
+    """Upload a photo — stored as base64 data URL in the database (survives redeploys)."""
+    import base64, mimetypes
     char = db.get_character(char_id)
     if not char:
         raise HTTPException(404, "Character not found")
 
-    # Validate file type
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+    mime_map = {".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",
+                ".webp":"image/webp",".gif":"image/gif"}
+    if ext not in mime_map:
         raise HTTPException(400, "Only jpg, png, webp, gif allowed")
 
-    filename  = f"char_{char_id}{ext}"
-    dest_path = PHOTOS_DIR / filename
+    data = await file.read()
+    # Limit to 2MB
+    if len(data) > 2 * 1024 * 1024:
+        raise HTTPException(400, "Photo must be under 2MB")
 
-    # Delete old photo if different extension
-    for old in PHOTOS_DIR.glob(f"char_{char_id}.*"):
-        if old != dest_path:
-            old.unlink(missing_ok=True)
+    mime = mime_map[ext]
+    b64  = base64.b64encode(data).decode("utf-8")
+    data_url = f"data:{mime};base64,{b64}"
 
-    with dest_path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    photo_url = f"/static/photos/{filename}"
-    db.update_character(char_id, {"photo": photo_url})
-    return {"photo": photo_url}
+    db.update_character(char_id, {"photo": data_url})
+    return {"photo": data_url}
 
 
 @app.delete("/api/characters/{char_id}/photo")

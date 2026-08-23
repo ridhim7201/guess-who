@@ -94,7 +94,7 @@ h1 span{color:var(--blue)}
           {{ c.skin }} skin · {{ c.hair }} {{ c.hair_style }} hair<br>
           {% if c.glasses %}glasses {% endif %}{% if c.hat %}hat {% endif %}{% if c.facial_hair %}beard{% endif %}
         </div>
-        <button class="btn btn-blue btn-full" onclick="openEdit({{c.id}})">
+        <button class="btn btn-blue btn-full" data-id="{{c.id}}" onclick="openEdit(parseInt(this.dataset.id))">
           <i class="ti ti-pencil"></i> Edit
         </button>
       </div>
@@ -236,10 +236,10 @@ let currentId = null;
 let pendingPhotoFile = null;
 
 async function openEdit(id) {
+  if (id === null || id === undefined) { showToast("Error: character ID missing"); return; }
   currentId = id;
   pendingPhotoFile = null;
 
-  // Retry up to 3 times in case server is waking from sleep
   let c = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -251,7 +251,7 @@ async function openEdit(id) {
   }
   if (!c) { showToast("Server not responding — try again in a moment"); return; }
 
-  (async (c) => {
+  {
       document.getElementById("modal-title").textContent = `Edit: ${c.name}`;
       document.getElementById("f-name").value         = c.name;
       document.getElementById("f-gender").value       = c.gender;
@@ -273,7 +273,7 @@ async function openEdit(id) {
         preview.classList.remove("show");
       }
       document.getElementById("edit-modal").classList.add("open");
-  })(c);
+  }
 }
 
 function closeModal() {
@@ -359,7 +359,7 @@ async function refreshCard(id) {
         ${c.skin} skin · ${c.hair} ${c.hair_style} hair<br>
         ${acc}
       </div>
-      <button class="btn btn-blue btn-full" onclick="openEdit(${c.id})">
+      <button class="btn btn-blue btn-full" data-id="${c.id}" onclick="openEdit(parseInt(this.dataset.id))">
         <i class="ti ti-pencil"></i> Edit
       </button>
     </div>`;
