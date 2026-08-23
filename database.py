@@ -2,7 +2,7 @@
 database.py
 SQLite database setup — characters and rooms.
 """
-import sqlite3, json, os
+import sqlite3, json, os, time
 
 # Use /tmp on read-only filesystems (Render free tier)
 # or override with DB_PATH env variable for persistent storage
