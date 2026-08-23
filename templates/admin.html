@@ -235,13 +235,23 @@ const SKIN_HEX = {
 let currentId = null;
 let pendingPhotoFile = null;
 
-function openEdit(id) {
+async function openEdit(id) {
   currentId = id;
   pendingPhotoFile = null;
 
-  fetch(`/api/characters/${id}`)
-    .then(r => r.json())
-    .then(c => {
+  // Retry up to 3 times in case server is waking from sleep
+  let c = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(`/api/characters/${id}`);
+      if (r.ok) { c = await r.json(); break; }
+    } catch(e) {
+      if (attempt < 2) await new Promise(res => setTimeout(res, 2000));
+    }
+  }
+  if (!c) { showToast("Server not responding — try again in a moment"); return; }
+
+  (async (c) => {
       document.getElementById("modal-title").textContent = `Edit: ${c.name}`;
       document.getElementById("f-name").value         = c.name;
       document.getElementById("f-gender").value       = c.gender;
@@ -263,7 +273,7 @@ function openEdit(id) {
         preview.classList.remove("show");
       }
       document.getElementById("edit-modal").classList.add("open");
-    });
+  })(c);
 }
 
 function closeModal() {
@@ -366,6 +376,19 @@ function showToast(msg) {
 document.getElementById("edit-modal").addEventListener("click", e => {
   if (e.target === e.currentTarget) closeModal();
 });
+
+// Keep server awake while on admin page (Render free tier sleeps after 15min)
+setInterval(() => fetch("/api/characters").catch(() => {}), 10 * 60 * 1000);
+
+// Wake server on load and show a notice if it's slow
+(async () => {
+  try {
+    const r = await fetch("/api/characters");
+    if (!r.ok) showToast("Server warming up — please wait a moment");
+  } catch(e) {
+    showToast("Server is waking up — please wait 30 seconds and refresh");
+  }
+})();
 </script>
 </body>
 </html>
