@@ -103,14 +103,23 @@ def get_all_characters():
     conn = get_conn()
     rows = conn.execute("SELECT * FROM characters ORDER BY id").fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    chars = []
+    for r in rows:
+        c = dict(r)
+        c["id"] = int(c["id"]) if c["id"] is not None else 0
+        chars.append(c)
+    return chars
 
 
 def get_character(char_id: int):
     conn = get_conn()
     row = conn.execute("SELECT * FROM characters WHERE id=?", (char_id,)).fetchone()
     conn.close()
-    return dict(row) if row else None
+    if not row:
+        return None
+    c = dict(row)
+    c["id"] = int(c["id"]) if c["id"] is not None else char_id
+    return c
 
 
 def update_character(char_id: int, fields: dict):

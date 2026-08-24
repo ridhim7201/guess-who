@@ -236,8 +236,9 @@ let currentId = null;
 let pendingPhotoFile = null;
 
 async function openEdit(id) {
-  if (id === null || id === undefined || isNaN(id)) { showToast("Error: character ID missing"); return; }
-  currentId = id;
+  const parsedId = parseInt(id);
+  if (isNaN(parsedId)) { showToast("Error: invalid character ID: " + id); return; }
+  currentId = parsedId;
   pendingPhotoFile = null;
 
   let c = null;
@@ -301,7 +302,8 @@ async function removePhoto() {
 }
 
 async function saveEdit() {
-  if (currentId === null || currentId === undefined) return;
+  console.log("saveEdit called, currentId =", currentId);
+  if (currentId === null || currentId === undefined) { showToast("Error: no character selected"); return; }
 
   // Upload photo first if pending
   if (pendingPhotoFile) {
@@ -377,18 +379,8 @@ document.getElementById("edit-modal").addEventListener("click", e => {
   if (e.target === e.currentTarget) closeModal();
 });
 
-// Keep server awake while on admin page (Render free tier sleeps after 15min)
-setInterval(() => fetch("/api/characters").catch(() => {}), 10 * 60 * 1000);
-
-// Wake server on load and show a notice if it's slow
-(async () => {
-  try {
-    const r = await fetch("/api/characters");
-    if (!r.ok) showToast("Server warming up — please wait a moment");
-  } catch(e) {
-    showToast("Server is waking up — please wait 30 seconds and refresh");
-  }
-})();
+// Keep server awake (ping every 10 min)
+setInterval(() => fetch(location.origin + "/api/characters").catch(() => {}), 10 * 60 * 1000);
 </script>
 </body>
 </html>
